@@ -1,0 +1,8 @@
+opencv-python>=4.9,<5
+# Pinned: newer mediapipe builds on some platforms/Python versions drop the
+# legacy mp.solutions.hands API this script depends on. 0.10.14 is confirmed
+# to still ship it.
+mediapipe==0.10.14
+numpy>=1.26,<2
+pyautogui>=0.9.54
+pynput>=1.7.6
