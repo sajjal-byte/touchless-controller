@@ -10,7 +10,7 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Optional
 
-# ─── Optional system-control imports (graceful fallback for headless env) ────
+
 try:
     import pyautogui
 
@@ -29,9 +29,6 @@ except Exception:
     PYNPUT_OK = False
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  ENUMS & CONFIG
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 class Mode(Enum):
@@ -49,9 +46,7 @@ class Mode(Enum):
 class AppConfig:
     WINDOW_NAME: str = "Touchless Controller"
     CAM_INDEX: int = 0
-    # Lower capture resolution = big speed win. MediaPipe processes every pixel
-    # you hand it, and the old 1280x720 default was doing far more work than it
-    # needed to for hand tracking. Raise this back up if your machine is fast.
+  
     CAM_W: int = 960
     CAM_H: int = 540
     FLIP: bool = True
@@ -83,15 +78,13 @@ class AppConfig:
 
 CFG = AppConfig()
 
-# ── MediaPipe aliases ─────────────────────────────────────────────────────────
+# ── MediaPipe 
 mp_hands = mp.solutions.hands
 LM = mp_hands.HandLandmark
 HAND_CONN = mp_hands.HAND_CONNECTIONS
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  LANDMARK HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 
 def lm(hand, idx, w, h):
@@ -137,10 +130,6 @@ def hand_label(result, idx):
     except Exception:
         return "Unknown"
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SYSTEM ACTIONS
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 def sys_move(x, y):
@@ -201,9 +190,6 @@ def map_camera_to_screen(x, y, x1, y1, x2, y2, scr_w, scr_h):
     return int(norm_x * scr_w), int(norm_y * scr_h)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  GESTURE STATE
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 @dataclass
@@ -238,14 +224,6 @@ class GestureDetector:
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  DRAWING UTILITIES
-#  (blend_rect / draw_hand_skeleton previously copied the ENTIRE frame on every
-#  call just to alpha-blend a small rectangle or a hand outline. With the HUD
-#  calling blend_rect ~15-20x per frame at 1280x720, that was the single
-#  biggest cause of slowdown. Both are rewritten below to only touch the
-#  pixels they actually need.)
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 def put_text(img, text, pos, scale=0.52, color=(255, 255, 255), thickness=1):
@@ -309,9 +287,7 @@ def draw_swipe_trail(frame, trail, color):
         cv2.line(frame, pts[i - 1], pts[i], c, max(2, int(4 * a)), cv2.LINE_AA)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  HUD
-# ══════════════════════════════════════════════════════════════════════════════
+
 
 GESTURE_HELP = [
     ("Index only", "Move cursor"),
@@ -421,10 +397,6 @@ def draw_hud(frame, gd: GestureDetector, fps: float, hands: int):
     put_text(frame, "OpenCV + MediaPipe", (12, fh - 12), scale=0.36, color=(42, 46, 58))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  MAIN LOOP
-# ══════════════════════════════════════════════════════════════════════════════
-
 
 def run():
     hands_solver = mp_hands.Hands(
@@ -440,7 +412,7 @@ def run():
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CFG.CAM_H)
     cap.set(cv2.CAP_PROP_FPS, 60)
     try:
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # don't let old frames queue up
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  
     except Exception:
         pass
 
@@ -534,17 +506,10 @@ def run():
             is_pinch_left = d_it < CFG.PINCH_THRESH_PX
             is_pinch_right = d_rt < CFG.PINCH_THRESH_PX
 
-            # ─────────────────────────────────────────────────────────────
-            # Gesture priority chain. IMPORTANT: click gestures are driven by
-            # tip-to-tip DISTANCE, not by whether the pinching finger reads
-            # as "up" -- a finger curling in to pinch will naturally fail
-            # the up/down test, which is exactly why clicks used to never
-            # fire. We only use the up/down test on fingers that are NOT
-            # part of the pinch, to tell gestures apart.
-            # ─────────────────────────────────────────────────────────────
+            
 
             if is_pinch_right and not index and not middle:
-                # Ring + thumb pinch, index & middle folded away -> right click
+               
                 gd.mode = Mode.RIGHT
                 now = time.time()
                 if now - gd.last_click > CFG.CLICK_COOLDOWN:
@@ -561,7 +526,7 @@ def run():
                 gd.swipe_trail.clear()
 
             elif is_pinch_left and not middle and not ring and not pinky:
-                # Index + thumb pinch, other fingers folded -> left click
+                
                 gd.pinch_ratio = max(0.0, 1.0 - d_it / CFG.PINCH_THRESH_PX)
                 gd.mode = Mode.CLICK
                 now = time.time()
@@ -580,7 +545,7 @@ def run():
                 gd.swipe_trail.clear()
 
             elif index and not middle and not ring and not pinky:
-                # Plain pointing finger -> cursor move
+               
                 gd.mode = Mode.CURSOR
                 screen_x, screen_y = map_camera_to_screen(
                     tip_idx[0], tip_idx[1], zone_x1, zone_y1, zone_x2, zone_y2, SCR_W, SCR_H
@@ -603,7 +568,7 @@ def run():
                 gd.swipe_trail.clear()
 
             elif n_up == 0:
-                # Closed fist -> volume, based on wrist height movement
+                
                 gd.mode = Mode.VOLUME
                 if gd.last_vol_y is not None:
                     dy = gd.last_vol_y - wrist[1]
@@ -619,7 +584,7 @@ def run():
                 gd.last_vol_y = None
                 gd.swipe_trail.clear()
 
-            # ── Three-finger center-to-side slide nav (independent check) ──
+           
             if n_up >= 3 and index and middle and ring:
                 center_x1 = int(fw * (0.5 - CFG.SLIDE_CENTER_RATIO))
                 center_x2 = int(fw * (0.5 + CFG.SLIDE_CENTER_RATIO))
